@@ -2,14 +2,15 @@ const display = document.body;
 let text = "";
 const dictionary = new Set();
 
-// Load dictionary (you can use a different word list if preferred)
+// Load dictionary
 fetch('https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt')
     .then(response => response.text())
     .then(data => {
         data.split('\n').forEach(word => {
-            dictionary.add(word.trim());
+            const cleanWord = word.trim().toLowerCase();
+            if (cleanWord.length >= 3) dictionary.add(cleanWord); // only keep words 3+ letters
         });
-        generateLetters(); // Start only after dictionary loads
+        generateLetters();
     });
 
 function generateLetters() {
@@ -17,32 +18,37 @@ function generateLetters() {
         const randomChar = String.fromCharCode(97 + Math.floor(Math.random() * 26));
         text += randomChar;
 
-        // Only analyze the most recent 100 characters
-        let windowText = text.slice(-100);
+        // Keep the last 200 characters max
+        const windowText = text.slice(-200);
         let highlighted = "";
 
-        for (let i = 0; i < windowText.length; i++) {
-            let found = false;
-            for (let j = windowText.length; j > i; j--) {
-                let segment = windowText.slice(i, j);
+        let i = 0;
+        while (i < windowText.length) {
+            let matched = false;
+
+            // Try matching the longest possible word first (up to 20 chars)
+            for (let j = Math.min(windowText.length, i + 20); j > i + 2; j--) {
+                const segment = windowText.slice(i, j);
                 if (dictionary.has(segment)) {
                     highlighted += `<span class="found">${segment}</span>`;
-                    i = j - 1;
-                    found = true;
+                    i = j;
+                    matched = true;
                     break;
                 }
             }
-            if (!found) {
+
+            if (!matched) {
                 highlighted += windowText[i];
+                i++;
             }
         }
 
         display.innerHTML = highlighted;
 
-        // Auto-scroll if user is at the bottom
+        // Autoscroll if near bottom
         const atBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 10;
         if (atBottom) {
             window.scrollTo(0, document.body.scrollHeight);
         }
-    }, 50); // 50ms delay between characters
+    }, 50);
 }
