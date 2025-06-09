@@ -10,12 +10,13 @@
       color: #0f0;
       font-family: monospace;
       font-size: 20px;
+      overflow-y: scroll;
       overflow-wrap: break-word;
+      white-space: pre-wrap;
     }
-
-    #output {
-      word-break: break-word;
-      white-space: normal;
+    .found {
+      color: red;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -25,24 +26,52 @@
   <script>
     const output = document.getElementById('output');
     const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+    let buffer = '';
+    let dict = new Set();
 
-    function getRandomLetter() {
-      return alphabet[Math.floor(Math.random() * alphabet.length)];
-    }
+    // 1. Load dictionary once (simple small word list):
+    fetch('https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt')
+      .then(r => r.text())
+      .then(txt => {
+        txt.split('\n').forEach(w => {
+          if (w.length >= 3) dict.add(w);
+        });
+      });
 
+    // 2. Generate random letters every batch
     function generateLetters() {
       let batch = '';
       for (let i = 0; i < 100; i++) {
-        batch += getRandomLetter();
+        batch += alphabet[Math.floor(Math.random() * alphabet.length)];
       }
-
-      const atBottom = (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 10;
-
+      buffer += batch;
       output.textContent += batch;
 
-      if (atBottom) {
-        window.scrollTo(0, document.body.scrollHeight);
+      // 3. Periodically scan for words every ~200 chars
+      if (buffer.length > 200) {
+        scanBufferForWords();
+        buffer = ''; // reset buffer after scanning
       }
+
+      // 4. Auto-scroll when at bottom
+      const atBottom = (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 10;
+      if (atBottom) window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    // 3. Scan visible text for words
+    function scanBufferForWords() {
+      // Words are sequences of a-z bounded by spaces/newlines
+      const words = output.textContent.split(/[^a-z]+/).filter(s => s.length >= 3);
+      const uniqueWords = Array.from(new Set(words));
+      uniqueWords.forEach(w => {
+        if (dict.has(w)) {
+          // Replace each occurrence (wrapped in spans)
+          output.innerHTML = output.innerHTML.replace(
+            new RegExp(`\\b${w}\\b`, 'g'),
+            `<span class="found">${w}</span>`
+          );
+        }
+      });
     }
 
     setInterval(generateLetters, 50);
